@@ -1,0 +1,43 @@
+model:
+  target: worker.vae.VideoCLIPVAE
+  params:        
+    use_cache_video_feat      : False
+    ckpt_dir_image_encoder     : "/data-04/xihua/data/ckpt/clip/ViT-B-16.pt"
+
+
+
+infer_data:
+  ckpt_path           : Null
+  # ## DEBUG
+  # batch_size          : 1
+  # num_workers         : 0
+  # prefetch_factor     : NULL
+  batch_size          : 30        
+  num_workers         : 30
+  prefetch_factor     : 2
+  persistent_workers  : False
+  collate_fn          : Null
+  target            : dataset.video.VideoDataset
+  params:
+    # Dataset params
+    verbose             : False
+    load_mode_meta      : Null
+    load_mode_item      : video_frame
+    meta_dir            : "/home/chengxin/chengxin/Dataset_Sound/MetaData/vaflow2_meta/clip"
+    split               : [vggsound_test]
+    # Audio video params
+    audio_process_config : ${data.audio_process}
+    video_process_config : ${data.video_process}
+
+
+
+lightning:
+  logger:
+    target        : pytorch_lightning.loggers.wandb.WandbLogger
+    params: 
+      project     : VAFlow
+      group       : clip_infer       # debug  |  audioldm_clip  |  beta  |  
+      name        : beta
+      tags        : 
+      notes       : ""
+      save_code   : False

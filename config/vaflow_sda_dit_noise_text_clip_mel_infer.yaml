@@ -1,0 +1,42 @@
+model:
+  params:
+    vaflow_ckpt_path : ./log/2025_05_18-20_29_26-vaflow_sda_dit_noise_text_clip_mel_10l_cn_scratch/ckpt/epoch=0189-step=3.32e+05.ckpt
+    ignore_keys: []
+    guidance_scale          : 3
+    sample_steps            : 10
+    sample_method           : dopri5
+    num_samples_per_prompt  : 1
+    dit_num_layers          : 10
+
+
+
+infer_data:
+  ckpt_path           : Null
+  batch_size          : 20
+  num_workers         : 10
+  prefetch_factor     : 2
+  persistent_workers  : False
+  collate_fn          : dataset.video.collate_fn_for_text
+  
+  target            : dataset.video.VideoDataset
+  params:
+    # Dataset params
+    verbose             : False
+    load_mode_meta      : Null
+    load_mode_item      : video_feat_ref_text_with_waveform
+    meta_dir            : /home/chengxin/chengxin/Dataset_Sound/MetaData/vaflow2_meta/meta
+    split               : test_25_ref_Chem_LRS2_GRID_VGG_LJSpeech     
+    dilimeter           : ${data.vggass.dilimeter}     
+    # Audio video params
+    audio_process_config : ${data.audio_process}
+    video_process_config : ${data.video_process}
+
+
+
+lightning:
+  logger:
+    target        : pytorch_lightning.loggers.wandb.WandbLogger
+    params: 
+      project     : VAFlow 
+      group       : infer  
+      # name        : bridge_dit_base_time_adaln_animatediff_audioldm_perceiver_cubic_aa

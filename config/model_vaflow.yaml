@@ -1,0 +1,29 @@
+
+# Model setting
+ckpt_dir_image_encoder     : "/home/chengxin/chengxin/vasflow/model/clip/ckpt/ViT-B-16.pt"
+ckpt_dir_audio_dit         : "/home/chengxin/chengxin/vasflow/model/stable_audio/ckpt/transformer_text"
+ckpt_dir_vocoder           : "/data-04/xihua/data/ckpt/audioldm2/huggingface/vocoder"
+vaflow_ckpt_path           : "/home/chengxin/chengxin/vasflow/log/2025_05_13-11_58_33-vaflow_sda_dit_noise_text_mel_10l_cc_first10/ckpt/epoch=0129-step=2.27e+05.ckpt" # "/home/chengxin/chengxin/vasflow/log/2025_07_14-15_32_04-vaflow_sda_dit_noise_text_mixas_mel_novide_randdropspkebd/ckpt/epoch=0019-step=1.26e+04.ckpt"  # /home/chengxin/chengxin/vasflow/log/2025_07_14-15_32_04-vaflow_sda_dit_noise_text_mixas_mel_novide_randdropspkebd/ckpt/epoch=0007-step=5.05e+03.ckpt
+resume_training            : False    # False
+ignore_keys                : []       # ['vaflow.preprocess_conv', 'vaflow.postprocess_conv', 'vaflow.proj_in', 'vaflow.proj_out']    # modified
+phone_ebd_dim              : 32       # /home/chengxin/chengxin/vasflow/model/stable_audio/ckpt/transformer/config.json -- in_channels and out_channels = phone_ebd_dim + original_channel (+1)
+cond_feat_dim              : 768
+dit_num_layers             : 10       # 12  |  24  |  6
+# VAE setting
+ckpt_dir_vae               : "/data-04/xihua/data/ckpt/audioldm2/huggingface/vae"
+vae_latent_scaling_factor  : 1.0
+original_channel           : 128      # The audio latent dim after the compression of VAE (64 for stable audio audio_codec, 16*8 for sd vae)
+audio_length_per_sec       : 25       # Modified. Same as the training data. Audio latent length after vae compression  
+# Training setting
+lr_warmup_steps         : 2000
+use_cache_video_feat    : True     # Related to {}
+unconditional_prob      : 0.1
+scale_factor            : 1.0
+# Val and infer setting  
+guidance_scale          : 3
+sample_steps            : 10
+sample_method           : dopri5
+audio_sample_rate       : 16000                                                                      # modified
+# PL training setting 
+monitor           : Null
+log_data_time     : False         # False  |  True

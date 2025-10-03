@@ -1,0 +1,26 @@
+dp_config:
+  phone_inputq_dim  : 64
+  phone_inputkv_dim : 64
+  phone_d_model     : 256
+  phone_nheads      : 4
+
+  hubert_inputq_dim  : 1024
+  hubert_inputkv_dim : 1024
+  hubert_d_model     : 256
+  hubert_nheads      : 4
+  encoder_num_layers : 2
+
+  attn_inputq_dim  : 128
+  attn_inputkv_dim : 128
+  attn_output_dim  : 64
+  attn_d_model     : 64
+  attn_nhead       : 1
+  attn_num_layers  : 4
+
+dp_ckpt_path : '/home/chengxin/chengxin/vasflow/log/2025_07_13-03_48_53-dp_tts_Lattn/ckpt/epoch=0319-step=1.31e+05.ckpt' # '/home/chengxin/chengxin/vasflow/log/2025_07_04-12_31_34-dp_visualtts_Lattn/ckpt/epoch=0319-step=3.97e+04.ckpt'
+resume_training : False
+lr_warmup_steps : 2000
+ignore_keys     : ['dp.phone_encoder.positial_embedding', 'dp.hubert_encoder.positial_embedding', 'dp.attn_decoder.positial_embedding']
+log_data_time   : True
+
+

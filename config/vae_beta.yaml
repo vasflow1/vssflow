@@ -1,0 +1,158 @@
+model:
+  # base_learning_rate: 2.5e-7
+  base_learning_rate: 5.0e-7
+  target: worker.vae.VideoCLIPVAE
+  params:        
+    # Model setting
+    ckpt_dir_image_encoder     : "/data-04/xihua/data/ckpt/clip/ViT-B-16.pt"
+    videoclipvae_config        : 
+      target        : model.vae.vae_vanilla.VanillaVAE_1D
+      params        :
+        in_channels : 768
+        latent_dim  : 320
+        # hidden_dims : [768, 768, 512, 512, 320, 320, 320]
+        hidden_dims : [768, 512, 320]
+    videoclipvae_ckpt_path     : Null
+    ignore_keys                : Null
+    # Training setting
+    lr_warmup_steps       : 2000
+    use_cache_video_feat  : True     # Related to {}
+    loss_kl_weight         : 8.0e-4
+    loss_image_contrastive_weight : 0.1
+    loss_video_clip_contrastive_weight : 0.1
+    loss_video_contrastive_weight : 0.1
+    loss_vv_ib_contrastive_weight : 0.1
+    loss_va_ib_contrastive_weight : 0.1
+    infonce_temperature    : 0.7
+    # Val and infer setting  
+    # PL training setting 
+    monitor           : Null
+    log_data_time     : False         # False  |  True
+
+
+
+data:
+  target                : worker.base.DataModuleFromConfig
+  params:
+    data_name_to_cfg: 
+      vggass            : ${data.vggass}
+    train               : vggass
+    validation          : vggass
+    test                : vggass
+    batch_size          : 200   # 8
+    num_workers         : 40
+    prefetch_factor     : 2
+    persistent_workers  : False 
+
+  audio_process:
+    duration              : 10.0
+    channel_num           : 1
+  video_process:
+    duration              : 10.0
+    resize_input_size     : [224, 224]       # [256, 320]  |  [320, 576]
+    target_sampling_rate  : 10
+    raw_duration_min_threshold : 0.05
+
+  # vggass:
+  #   # meta_dir            : "/data_mount/vadio/meta/specvqgan_split_withaudiosetrhythm_mp4xclipb16xibva_docker"
+  #   meta_dir            : "/home/chengxin/chengxin/Dataset_Sound/vaflow2_meta"
+  #   train:
+  #     target            : dataset.video.VideoDataset
+  #     params:
+  #       # Dataset params
+  #       verbose             : False
+  #       load_mode_meta      : Null
+  #       load_mode_item      : video_feat_with_ib     # video_frame  |  video_feat  |  video_feat
+  #       meta_dir            : ${data.vggass.meta_dir}
+  #       split               : train
+  #       # Audio video params
+  #       audio_process_config : ${data.audio_process}
+  #       video_process_config : ${data.video_process}
+  #   validation:
+  #     target            : dataset.video.VideoDataset
+  #     params:
+  #       # Dataset params
+  #       verbose             : False
+  #       load_mode_meta      : Null
+  #       load_mode_item      : video_feat_with_ib
+  #       meta_dir            : ${data.vggass.meta_dir}
+  #       split               : val
+  #       # Audio video params
+  #       audio_process_config : ${data.audio_process}
+  #       video_process_config : ${data.video_process}
+  #   test:
+  #     target            : dataset.video.VideoDataset
+  #     params:
+  #       # Dataset params
+  #       verbose             : False
+  #       load_mode_meta      : Null
+  #       load_mode_item      : video_feat_with_ib
+  #       meta_dir            : ${data.vggass.meta_dir}
+  #       split               : test
+  #       # Audio video params
+  #       audio_process_config : ${data.audio_process}
+  #       video_process_config : ${data.video_process}
+
+
+
+lightning:
+  logger:
+    target        : pytorch_lightning.loggers.wandb.WandbLogger
+    params: 
+      project     : VAFlow
+      group       : beta      # debug  |  audioldm_clip  |  beta  |  
+      name        : beta_with_cl_small
+      tags        : 
+      notes       : ""
+      save_code   : False
+
+  trainer:
+    strategy              : ddp_find_unused_parameters_false       # ddp  |  ddp_find_unused_parameters_false
+    max_epochs            : 500
+    profiler              : Null
+    auto_scale_batch_size : Null
+    # precision             : ${model.params.mapper_precision}        # 16  |  32
+    check_val_every_n_epoch : 10   # 1  |  5  |  10  | Null
+    # val_check_interval      : 2000
+    limit_val_batches       : 1.0
+    limit_train_batches     : 1.0
+    num_sanity_val_steps    : 1   # 0
+    log_every_n_steps       : 50
+    accumulate_grad_batches : 1
+    detect_anomaly          : False
+
+  callbacks:
+    learning_rate_logger:
+      target              : pytorch_lightning.callbacks.LearningRateMonitor
+      params:
+        logging_interval  : "step"
+        log_momentum      : False
+
+    modelcheckpoint:
+      target              : pytorch_lightning.callbacks.ModelCheckpoint
+      params: 
+        filename          : "{epoch:04}-{step:.2e}"
+        verbose           : True
+        save_last         : True
+        # For save num and monitor:
+        save_top_k        : -1    # 0 for no save, -1 for save all, n for save top n, default: 1 (last one with no monitor)
+        monitor           : Null
+        mode              : "min"
+        # For every_n_epochs:
+        # Note: must work with setting trainer: max_epochs=N, check_val_every_n_epoch=M, save_on_train_epoch_end=False
+        every_n_epochs    : 20     # 1  |  5  |  10  | Null
+        # every_n_train_steps : 2000    # 1000  |  2000  |  5000  |  Null
+        save_on_train_epoch_end : False
+        
+    # early_stop:
+    #   target              : pytorch_lightning.callbacks.EarlyStopping
+    #   params: 
+    #     monitor           : "val/loss"
+    #     min_delta         : 0.005
+    #     mode              : "min"
+    #     patience          : 20
+
+
+
+platform:
+  matmul_precision  : medium      # medium  |  high

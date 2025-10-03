@@ -1,0 +1,132 @@
+model:
+  # Aligner: /home/chengxin/chengxin/vasflow/log/2025_07_04-12_31_34-dp_Lattn/ckpt/epoch=0319-step=3.97e+04.ckpt
+  # DP for path prediction: /home/chengxin/chengxin/vasflow/model/dp/test.ipynb   /home/chengxin/chengxin/Dataset_Sound/MetaData/vaflow2_meta/meta/untitled.ipynb
+  base_learning_rate: 4.0e-7
+  target: worker.dp_tts.DurationPredictor
+  params:        
+    dp_config:
+      phone_inputq_dim  : 64
+      phone_inputkv_dim : 64
+      phone_d_model     : 256
+      phone_nheads      : 4
+
+      hubert_inputq_dim  : 1024
+      hubert_inputkv_dim : 1024
+      hubert_d_model     : 256
+      hubert_nheads      : 4
+      encoder_num_layers : 2
+
+      attn_inputq_dim  : 128
+      attn_inputkv_dim : 128
+      attn_output_dim  : 64
+      attn_d_model     : 64
+      attn_nhead       : 1
+      attn_num_layers  : 4
+
+    dp_ckpt_path : '/home/chengxin/chengxin/vasflow/log/2025_07_04-12_31_34-dp_visualtts_Lattn/ckpt/epoch=0319-step=3.97e+04.ckpt'
+    resume_training : False
+    lr_warmup_steps : 2000
+    ignore_keys     : ['dp.phone_encoder.positial_embedding', 'dp.hubert_encoder.positial_embedding', 'dp.attn_decoder.positial_embedding']
+    log_data_time   : True
+
+
+
+data:
+  target                : worker.base.DataModuleFromConfig
+  params:
+    data_name_to_cfg: 
+      lipphone            : ${data.lipphone}
+    train               : lipphone
+    validation          : lipphone
+    test                : lipphone
+    batch_size          : 36   # 48
+    # num_workers         : 0
+    # prefetch_factor     : NULL
+    num_workers         : 36
+    prefetch_factor     : 2
+    collate_fn          :  dataset.avhubert.collate_fn_for_text
+    persistent_workers  : False 
+
+  lipphone:
+    # meta_dir            : "/data_mount/vadio/meta/vggsound_split_withaudiosetrhythm_mp4xclipb16xibva_docker"
+    meta_dir            : "/home/chengxin/chengxin/Dataset_Sound/MetaData/vaflow2_meta/dp"             # modified
+    mask_ratio          : 0.3
+    train:
+      target            : dataset.avhubert.LipPhoneDataset
+      params:
+        meta_dir            : ${data.lipphone.meta_dir}
+        split               : train_25_Chem_GRID_LRS2
+        mask_ratio          : ${data.lipphone.mask_ratio}
+    validation:
+      target            : dataset.avhubert.LipPhoneDataset
+      params:
+        meta_dir            : ${data.lipphone.meta_dir}
+        split               : test_25_Chem_GRID_LRS2     
+        mask_ratio          : ${data.lipphone.mask_ratio}
+    test:
+      target            : dataset.avhubert.LipPhoneDataset
+      params:
+        meta_dir            : ${data.lipphone.meta_dir}
+        split               : test_25_Chem_GRID_LRS2
+        mask_ratio          : ${data.lipphone.mask_ratio}
+
+
+
+
+
+
+
+
+lightning:
+  logger:
+    target        : pytorch_lightning.loggers.wandb.WandbLogger
+    params: 
+      project     : VAFlow
+      group       : vaflow       # debug  |  beta  |  vaflow_beta  |  vaflow  |   vaflow_framework
+      name        : on_sda_dit_noise
+      tags        : 
+      notes       : ""
+      save_code   : False
+
+  trainer:
+    strategy              : ddp       # ddp  |  ddp_find_unused_parameters_false
+    max_epochs            : 400
+    profiler              : Null
+    auto_scale_batch_size : Null
+    # precision             : ${model.params.mapper_precision}        # 16  |  32
+    check_val_every_n_epoch : 40   # 1  |  5  |  10  | Null
+    # val_check_interval      : 2000
+    limit_val_batches       : 1.0
+    limit_train_batches     : 1.0
+    num_sanity_val_steps    : 1   # 0
+    log_every_n_steps       : 50
+    accumulate_grad_batches : 2
+    detect_anomaly          : False
+
+  callbacks:
+    learning_rate_logger:
+      target              : pytorch_lightning.callbacks.LearningRateMonitor
+      params:
+        logging_interval  : "step"
+        log_momentum      : False
+
+    modelcheckpoint:
+      target              : pytorch_lightning.callbacks.ModelCheckpoint
+      params: 
+        filename          : "{epoch:04}-{step:.2e}"
+        verbose           : True
+        save_last         : True
+        # For save num and monitor:
+        save_top_k        : -1    # 0 for no save, -1 for save all, n for save top n, default: 1 (last one with no monitor)
+        monitor           : Null
+        mode              : "min"
+        # For every_n_epochs:
+        # Note: must work with setting trainer: max_epochs=N, check_val_every_n_epoch=M, save_on_train_epoch_end=False
+        every_n_epochs    : 40     # 1  |  5  |  10  | Null
+        # every_n_train_steps : 2000    # 1000  |  2000  |  5000  |  Null
+        save_on_train_epoch_end : False
+
+
+
+platform:
+  matmul_precision  : medium      # medium  |  high

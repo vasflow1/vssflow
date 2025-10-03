@@ -1,0 +1,46 @@
+model:
+  params:
+    vaflow_ckpt_path : ./log/2025_05_13-11_58_33-vaflow_sda_dit_noise_text_mel_10l_cc_first10/ckpt/epoch=0129-step=2.27e+05.ckpt
+    # best svas:  ./log/2025_05_13-11_58_33-vaflow_sda_dit_noise_text_mel_10l_cc_first10/ckpt/epoch=0129-step=2.27e+05.ckpt
+    # vas: ./log/2025_06_03-12_05_50-vaflow_sda_dit_noise_text_mel_10l_cc_first10_vas/ckpt/epoch=0079-step=9.56e+04.ckpt 
+    # va : ./log_backup/2025_06_03-12_03_26-vaflow_sda_dit_noise_text_mel_10l_cc_first10_va/ckpt/epoch=0159-step=1.01e+05.ckpt
+    # sva: ./log_backup/2025_06_10-21_53_23-vaflow_sda_dit_noise_text_mel_10l_cc_first10_sva/ckpt/epoch=0089-step=1.07e+05.ckpt
+    ignore_keys: []
+    guidance_scale          : 1.5  # 3 for v2a and 1.5 for speech
+    sample_steps            : 10
+    sample_method           : dopri5   # midpoint |  dopri5 | euler 
+    num_samples_per_prompt  : 1
+    dit_num_layers          : 10
+
+
+
+infer_data:
+  ckpt_path           : Null
+  batch_size          : 36
+  num_workers         : 36
+  prefetch_factor     : 2
+  persistent_workers  : False
+  collate_fn          : dataset.video.collate_fn_for_text
+  
+  target            : dataset.video.VideoDataset
+  params:
+    # Dataset params
+    verbose             : False
+    load_mode_meta      : Null
+    load_mode_item      : video_feat_ref_text_with_waveform
+    meta_dir            : /home/chengxin/chengxin/Dataset_Sound/MetaData/vaflow2_meta/meta    # /home/chengxin/chengxin/Dataset_Sound/MetaData/vaflow2_meta/meta
+    split               : test_25_ref_predp_Chem_GRID     # test_25_ref_Chem_LRS2_GRID_LJSpeech test_25_ref_Chem_LRS2_GRID_VGG_LJSpeech  test_25_gtref_VGG  test_25_gtref_Chem_LRS2_GRID_VGG_LJSpeech
+    dilimeter           : ${data.vggass.dilimeter}     
+    # Audio video params
+    audio_process_config : ${data.audio_process}
+    video_process_config : ${data.video_process}
+
+
+
+lightning:
+  logger:
+    target        : pytorch_lightning.loggers.wandb.WandbLogger
+    params: 
+      project     : VAFlow 
+      group       : infer  
+      # name        : bridge_dit_base_time_adaln_animatediff_audioldm_perceiver_cubic_aa

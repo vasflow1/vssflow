@@ -1,0 +1,160 @@
+model:
+  base_learning_rate: 4.0e-7
+  target: worker.vaflow_sda_dit_noise_clip_mel.VAFlow
+  params:        
+    # Model setting
+    ckpt_dir_image_encoder     : "/home/chengxin/chengxin/vasflow/model/clip/ckpt/ViT-B-16.pt"
+    ckpt_dir_audio_dit         : "/home/chengxin/chengxin/vasflow/model/stable_audio/ckpt/transformer_clip"
+    ckpt_dir_vocoder           : "/data-04/xihua/data/ckpt/audioldm2/huggingface/vocoder"
+    vaflow_ckpt_path           : # "./log/2025_05_01-12_39_37-vaflow_sda_dit_noise_text_mel_noise_sr16000/ckpt/epoch=0109-step=1.44e+05.ckpt" # "./log/2025_04_30-01_06_12-vaflow_sda_dit_noise_text_mel_noise_sr16000/ckpt/epoch=0019-step=2.62e+04.ckpt"    #   "./log/2025_02_18-23_57_33-vaflow_sda_dit_noise/ckpt/epoch=0094-step=2.17e+05.ckpt"
+    resume_training            : False     # False
+    ignore_keys                : ['vaflow.preprocess_conv', 'vaflow.postprocess_conv', 'vaflow.proj_in', 'vaflow.proj_out']       # ['vaflow.preprocess_conv', 'vaflow.postprocess_conv', 'vaflow.proj_in', 'vaflow.proj_out']    # modified
+    phone_ebd_dim              : 32       # /home/chengxin/chengxin/vasflow/model/stable_audio/ckpt/transformer/config.json -- in_channels and out_channels = phone_ebd_dim + original_channel (+1)
+    cond_feat_dim              : 768
+    dit_num_layers             : 10       # 12  |  24  |  6
+    # VAE setting
+    ckpt_dir_vae               : "/data-04/xihua/data/ckpt/audioldm2/huggingface/vae"
+    vae_latent_scaling_factor  : 1.0
+    original_channel           : 128      # The audio latent dim after the compression of VAE (64 for stable audio audio_codec, 16*8 for sd vae)
+    audio_length_per_sec       : 25       # Modified. Same as the training data. Audio latent length after vae compression  
+    # Training setting
+    lr_warmup_steps         : 2000
+    use_cache_video_feat    : True     # Related to {}
+    unconditional_prob      : 0.1
+    scale_factor            : 1.0
+    # Val and infer setting  
+    guidance_scale          : 3
+    sample_steps            : 10
+    sample_method           : dopri5
+    audio_sample_rate       : 16000                                                                      # modified
+    # PL training setting 
+    monitor           : Null
+    log_data_time     : False         # False  |  True
+
+
+
+data:
+  target                : worker.base.DataModuleFromConfig
+  params:
+    data_name_to_cfg: 
+      vggass            : ${data.vggass}
+    train               : vggass
+    validation          : vggass
+    test                : vggass
+    batch_size          : 36   # 48
+    # num_workers         : 0
+    # prefetch_factor     : NULL
+    num_workers         : 36
+    prefetch_factor     : 2
+    collate_fn          : dataset.video.collate_fn_for_text
+    persistent_workers  : False 
+
+  audio_process:
+    duration              : 10.0
+    sample_rate           : ${model.params.audio_sample_rate}                                            # modified
+    channel_num           : 1                                                                            # modified (2 for stable audio audio_codec, 1 for sd vae)
+  video_process:
+    duration              : 10.0
+    resize_input_size     : [224, 224]        
+    target_sampling_rate  : 10
+    raw_duration_min_threshold : 0.2                                                                     # modified
+
+  vggass:
+    # meta_dir            : "/data_mount/vadio/meta/vggsound_split_withaudiosetrhythm_mp4xclipb16xibva_docker"
+    meta_dir            : "/home/chengxin/chengxin/Dataset_Sound/MetaData/vaflow2_meta/meta"             # modified
+    dilimeter           : "|"
+    train:
+      target            : dataset.video.VideoDataset
+      params:
+        # Dataset params
+        verbose             : False
+        load_mode_meta      : Null
+        load_mode_item      : video_feat_ref_text_with_waveform     # video_frame  |  video_feat  |  video_feat_with_waveform
+        meta_dir            : ${data.vggass.meta_dir}
+        split               : train_25_ref_Chem_LRS2_GRID_VGG_LibriTTS_LJSpeech      # train  |  train_speconly_ibtop_half   |  train_speconly
+        dilimeter           : ${data.vggass.dilimeter}
+        # Audio video params
+        audio_process_config : ${data.audio_process}
+        video_process_config : ${data.video_process}
+    validation:
+      target            : dataset.video.VideoDataset
+      params:
+        # Dataset params
+        verbose             : False
+        load_mode_meta      : Null
+        load_mode_item      : video_feat_ref_text_with_waveform
+        meta_dir            : ${data.vggass.meta_dir}
+        split               : test_25_ref_Chem_LRS2_GRID_VGG_LJSpeech                       # val  |  val_sample200
+        dilimeter           : ${data.vggass.dilimeter}
+        # Audio video params
+        audio_process_config : ${data.audio_process}
+        video_process_config : ${data.video_process}
+    test:
+      target            : dataset.video.VideoDataset
+      params:
+        # Dataset params
+        verbose             : False
+        load_mode_meta      : Null
+        load_mode_item      : video_feat_ref_text_with_waveform
+        meta_dir            : ${data.vggass.meta_dir}
+        split               : test_25_ref_Chem_LRS2_GRID_VGG_LJSpeech
+        dilimeter           : ${data.vggass.dilimeter}
+        # Audio video params
+        audio_process_config : ${data.audio_process}
+        video_process_config : ${data.video_process}
+
+
+
+lightning:
+  logger:
+    target        : pytorch_lightning.loggers.wandb.WandbLogger
+    params: 
+      project     : VAFlow
+      group       : vaflow       # debug  |  beta  |  vaflow_beta  |  vaflow  |   vaflow_framework
+      name        : on_sda_dit_noise
+      tags        : 
+      notes       : ""
+      save_code   : False
+
+  trainer:
+    strategy              : ddp       # ddp  |  ddp_find_unused_parameters_false
+    max_epochs            : 500
+    profiler              : Null
+    auto_scale_batch_size : Null
+    # precision             : ${model.params.mapper_precision}        # 16  |  32
+    check_val_every_n_epoch : 10   # 1  |  5  |  10  | Null
+    # val_check_interval      : 2000
+    limit_val_batches       : 1.0
+    limit_train_batches     : 1.0
+    num_sanity_val_steps    : 1   # 0
+    log_every_n_steps       : 50
+    accumulate_grad_batches : 2
+    detect_anomaly          : False
+
+  callbacks:
+    learning_rate_logger:
+      target              : pytorch_lightning.callbacks.LearningRateMonitor
+      params:
+        logging_interval  : "step"
+        log_momentum      : False
+
+    modelcheckpoint:
+      target              : pytorch_lightning.callbacks.ModelCheckpoint
+      params: 
+        filename          : "{epoch:04}-{step:.2e}"
+        verbose           : True
+        save_last         : True
+        # For save num and monitor:
+        save_top_k        : -1    # 0 for no save, -1 for save all, n for save top n, default: 1 (last one with no monitor)
+        monitor           : Null
+        mode              : "min"
+        # For every_n_epochs:
+        # Note: must work with setting trainer: max_epochs=N, check_val_every_n_epoch=M, save_on_train_epoch_end=False
+        every_n_epochs    : 10     # 1  |  5  |  10  | Null
+        # every_n_train_steps : 2000    # 1000  |  2000  |  5000  |  Null
+        save_on_train_epoch_end : False
+
+
+
+platform:
+  matmul_precision  : medium      # medium  |  high
