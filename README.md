@@ -1,6 +1,9 @@
 # VSSFlow: Unifying Video-conditioned Sound and Speech Generation via Joint Learning
 
-- TODO: Organize code......
+- TODO: 
+  - [x] Open-source main code.
+  - [ ] Open-source model weights.
+  - [ ] Organize code and provide an inference demo.
 
 
 
