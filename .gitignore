@@ -23,7 +23,6 @@ temp
 *.mp4
 *.out
 *.txt
-*.png
 *.tar.gz
 *.safetensors
 nohup.out
