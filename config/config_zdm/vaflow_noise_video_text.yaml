@@ -1,0 +1,153 @@
+model:
+  base_learning_rate: 4.0e-7
+  target: worker.vaflow_noise_video_text.VAFlow
+  params:        
+    # Model setting
+    ckpt_dir_image_encoder     : "./assets/clip/ViT-B-16.pt"
+    ckpt_dir_audio_dit         : "./assets/stable_audio/ckpt/transformer_video_text"
+    ckpt_dir_vocoder           : "./assets/vocoder"
+    vaflow_ckpt_path           : # "./log/2025_05_30-17_23_47-vaflow_sda_dit_noise_mel_10l_cct_first10/ckpt/epoch=0199-step=3.50e+05.ckpt"   ### "./log/2025_05_01-12_39_37-vaflow_sda_dit_noise_text_mel_noise_sr16000/ckpt/epoch=0109-step=1.44e+05.ckpt" # "./log/2025_04_30-01_06_12-vaflow_sda_dit_noise_text_mel_noise_sr16000/ckpt/epoch=0019-step=2.62e+04.ckpt"    #   "./log/2025_02_18-23_57_33-vaflow_sda_dit_noise/ckpt/epoch=0094-step=2.17e+05.ckpt"
+    resume_training            : False    
+    ignore_keys                : [] # ['vaflow.preprocess_conv', 'vaflow.postprocess_conv', 'vaflow.proj_in', 'vaflow.proj_out']    # modified
+    phone_ebd_dim              : 32       
+    cond_feat_dim              : 768     # transformer config cross_attention_dim = synch_feat_dim + lip_feat_dim = 1792
+    dit_num_layers             : 10      
+    synch_feat_dim             : 768    
+    lip_feat_dim               : 1024    # transformer config in_channel = cond_feat_dim + phone_ebd_dim + original_channel = 928
+    # VAE setting
+    ckpt_dir_vae               : "./assets/vae"
+    vae_latent_scaling_factor  : 1.0
+    original_channel           : 128      
+    audio_duration_sec         : 10
+    audio_length_per_sec       : 25       
+    # Training setting
+    lr_warmup_steps         : 2000
+    use_cache_video_feat    : True    
+    unconditional_prob      : 0.1
+    scale_factor            : 1.0
+    # Val and infer setting  
+    guidance_scale          : 3
+    sample_steps            : 10      
+    sample_method           : dopri5  
+    audio_sample_rate       : 16000                                                                  
+    # PL training setting 
+    monitor           : Null
+    log_data_time     : False        
+
+
+
+data:
+  target                : worker.base.DataModuleFromConfig
+  params:
+    data_name_to_cfg: 
+      vggass            : ${data.vggass}
+    train               : vggass
+    validation          : vggass
+    test                : vggass
+    batch_size          : 72   # 48
+    # num_workers         : 0
+    # prefetch_factor     : NULL
+    num_workers         : 48
+    prefetch_factor     : 4
+    collate_fn          : dataset.video.collate_fn_for_lip                                   #####
+    persistent_workers  : True 
+
+  audio_process:
+    duration              : ${model.params.audio_duration_sec}
+    audio_latent_fps      : ${model.params.audio_length_per_sec}
+    sample_rate           : ${model.params.audio_sample_rate}                                            
+    channel_num           : 1                                                                           
+
+
+  vggass:
+    meta_dir            : "./data/data_zdm"             
+    dilimeter           : "|"
+    train:
+      target            : dataset.video.VideoDataset
+      params:
+        # Dataset params
+        load_mode_item      : video_feat_ref_lip_synch_text_with_waveform                             
+        meta_dir            : ${data.vggass.meta_dir}
+        split               : train_25_gtref_Chem_LRS2_GRID_VGG
+        dilimeter           : ${data.vggass.dilimeter}
+        # Audio video params
+        audio_process_config : ${data.audio_process}
+
+    validation:
+      target            : dataset.video.VideoDataset
+      params:
+        # Dataset params
+        load_mode_item      : video_feat_ref_lip_synch_text_with_waveform                         
+        meta_dir            : ${data.vggass.meta_dir}
+        split               : test_25_randref_Chem_LRS2_GRID_VGG
+        dilimeter           : ${data.vggass.dilimeter}
+        # Audio video params
+        audio_process_config : ${data.audio_process}
+
+    test:
+      target            : dataset.video.VideoDataset
+      params:
+        # Dataset params
+        load_mode_item      : video_feat_ref_lip_synch_text_with_waveform
+        meta_dir            : ${data.vggass.meta_dir}
+        split               : test_25_randref_Chem_LRS2_GRID_VGG  
+        dilimeter           : ${data.vggass.dilimeter}
+        # Audio video params
+        audio_process_config : ${data.audio_process}
+
+
+
+
+lightning:
+  logger:
+    target        : pytorch_lightning.loggers.wandb.WandbLogger
+    params: 
+      project     : VAFlow
+      group       : vaflow       
+      name        : on_sda_dit_noise
+      tags        : 
+      notes       : ""
+      save_code   : False
+
+  trainer:
+    strategy              : ddp      
+    max_epochs            : 210      
+    profiler              : Null
+    auto_scale_batch_size : Null
+    # precision             : ${model.params.mapper_precision}        # 16  |  32
+    check_val_every_n_epoch : 30   
+    # val_check_interval      : 2000
+    limit_val_batches       : 1.0
+    limit_train_batches     : 1.0
+    num_sanity_val_steps    : 1   # 0
+    log_every_n_steps       : 50
+    accumulate_grad_batches : 2
+    detect_anomaly          : False
+
+  callbacks:
+    learning_rate_logger:
+      target              : pytorch_lightning.callbacks.LearningRateMonitor
+      params:
+        logging_interval  : "step"
+        log_momentum      : False
+
+    modelcheckpoint:
+      target              : pytorch_lightning.callbacks.ModelCheckpoint
+      params: 
+        filename          : "{epoch:04}-{step:.2e}"
+        verbose           : True
+        save_last         : True
+        # For save num and monitor:
+        save_top_k        : -1    # 0 for no save, -1 for save all, n for save top n, default: 1 (last one with no monitor)
+        monitor           : Null
+        mode              : "min"
+        # For every_n_epochs:
+        # Note: must work with setting trainer: max_epochs=N, check_val_every_n_epoch=M, save_on_train_epoch_end=False
+        every_n_epochs    : 10     # 1  |  5  |  10  | Null
+        # every_n_train_steps : 2000    # 1000  |  2000  |  5000  |  Null
+        save_on_train_epoch_end : False
+
+
+
+platform:
+  matmul_precision  : medium      # medium  |  high

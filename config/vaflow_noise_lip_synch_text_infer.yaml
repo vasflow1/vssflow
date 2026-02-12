@@ -1,0 +1,43 @@
+model:
+  params:
+    vaflow_ckpt_path : ./log/2025_12_30-17_38_30-vaflow_noise_lip_synch_text_ttsvtts/ckpt/last.ckpt # ./log/2025_12_24-01_12_48-vaflow_noise_lip_synch_text_masklip/ckpt/last.ckpt
+    ignore_keys: []
+    guidance_scale          : 3
+    sample_steps            : 10
+    sample_method           : dopri5
+    num_samples_per_prompt  : 1
+    dit_num_layers          : 10
+
+
+
+
+
+infer_data:
+  ckpt_path           : Null
+  batch_size          : 16
+  num_workers         : 8
+  prefetch_factor     : 2
+  persistent_workers  : False
+  collate_fn          : dataset.video.collate_fn_for_lip
+  
+  target            : dataset.video.VideoDataset
+  params:
+    # Dataset params
+    verbose             : False
+    load_mode_item      : video_feat_ref_lip_synch_text_with_waveform                         
+    meta_dir            : ${data.vggass.meta_dir}
+    split               : test_25_gtref_LRS2_nolip4dpo  
+    dilimeter           : ${data.vggass.dilimeter}
+    # Audio video params
+    audio_process_config : ${data.audio_process}
+
+
+
+lightning:
+  logger:
+    target        : pytorch_lightning.loggers.wandb.WandbLogger
+    params: 
+      project     : VAFlow 
+      group       : infer  
+
+      # name        : bridge_dit_base_time_adaln_animatediff_audioldm_perceiver_cubic_aa

@@ -1,0 +1,26 @@
+log/
+assets/
+feature/avhubert/data
+feature/avhubert/infer_data
+feature/avhubert/infer_data2
+*/__pycache__/*
+
+.ipynb
+*.out
+*.err
+*.pth
+*.pt
+*.ckpt
+*.pkl
+*.npy
+*.pickle
+*.bin
+*.h5
+*.hdf5
+*.wav
+*.flac
+*.mp4
+*.txt
+*.lab
+*.jpg
+# *.csv
